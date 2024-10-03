@@ -1,25 +1,17 @@
+"use client";
 import { Forklift, Monitor, UserRound } from "lucide-react";
+import { useRouter } from 'next/navigation';
 
+export default function TeamBoard() {
+    const router = useRouter();
 
-// Return a list of `params` to populate the [slug] dynamic segment
-export async function generateStaticParams() {
-  const teams = await fetch('http://localhost:5000/api/teams').then((res) => res.json());
+  const userTeam = localStorage.getItem("userTeam");
 
-  // Return the dynamic params to populate the [slug] segment
-  return teams.map((team) => ({
-    slug: team.slug,  // Assuming the API returns a slug for each team
-  }));
-}
-
-export default async function TeamProfile({ params }: { params: { slug: string } }) {
-  // Fetch the specific team based on the slug from the URL
-  const team = await fetch(`http://localhost:5000/api/teams/${params.slug}`).then((res) => res.json());
-
-  if (!team) {
-    return <div>Loading...</div>;  // Handle loading or error case
+  if (!userTeam) {
+      router.push("/auth/login");
   }
 
-  const { name, points, players, cash } = team;
+  const { name, slug, cash, total_points, weekly_points} = userTeam;
 
   // Ensure there are at least 5 players for the layout
   const topPlayers = players.slice(0, 3);
@@ -31,7 +23,7 @@ export default async function TeamProfile({ params }: { params: { slug: string }
     <div className="grid grid-rows-[20px_1fr_20px] min-h-screen p-8 pb-20 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col row-start-2 items-center sm:items-start">
         <div className="flex flex-row w-full h-5 mb-4 px-8 justify-between">
-          <h1>{name} | Points: {points} | Cash: ${cash}</h1>
+          <h1>{name} | TTP: {total_points} | WP: {weekly_points} | Cash: ${cash}</h1>
           <div className="flex flex-row">
             <a href="/teams" className="underline mx-2">Leaderboard</a>
             <a href="/players" className="underline">Player List</a>
