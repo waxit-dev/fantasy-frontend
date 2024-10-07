@@ -11,11 +11,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 
 export default function LoginForm() {
   const [teamName, setTeamName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const router = useRouter();
 
   // Function to create a slug from the team name
   const createSlug = (name: string) => {
@@ -28,15 +30,14 @@ export default function LoginForm() {
     const slug = createSlug(teamName);
 
     try {
-      const response = await fetch("http://localhost:5000/api/teams", {
+      const response = await fetch("http://localhost:5000/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: teamName,
-          password,
           slug,
+          password
         }),
       });
 
@@ -46,7 +47,9 @@ export default function LoginForm() {
 
       const data = await response.json();
       console.log("Login successful:", data);
-
+        localStorage.setItem("userTeam", JSON.stringify(data.team));
+        localStorage.setItem("teamPlayers", JSON.stringify(data.players));
+        router.push("/");
       // Handle successful login, e.g., redirect to dashboard or update UI
     } catch (err) {
       setError("Failed to login. Please check your credentials and try again.");

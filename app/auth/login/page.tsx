@@ -1,7 +1,4 @@
 import LoginForm from "@/components/authentication-01";
-import { User } from "lucide-react";
-import Link from 'next/link';
-
 export default async function Login() {
 
   return (
