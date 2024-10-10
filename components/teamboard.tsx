@@ -7,7 +7,7 @@ export default function TeamBoard() {
 
     const storedTeam = localStorage.getItem("userTeam");
     let userTeam;
-    if(storedTeam) {
+    if (storedTeam) {
         userTeam = JSON.parse(storedTeam);
     } else {
         router.push("/auth/login");
@@ -19,8 +19,24 @@ export default function TeamBoard() {
     if (storedPlayers) {
         try {
             players = JSON.parse(storedPlayers);
+            if (players.length < 5) {
+                let tempPlayers = Array(5 - players.length).fill(
+                    {
+                        id: 0,
+                        name: "Select Player",
+                        overall_rating: 0.00,
+                        attendance: 0,
+                        social: 0,
+                        productivity: 0,
+                        intensity: 0,
+                        specialty_rating: 0,
+                        salary: 0
+                    }
+                );
+                players = [...players, ...tempPlayers];
+            }
         } catch (error) {
-            console.error("Error parsing JSON from localStorage", error);
+            console.error("Error parsing JSON from localStorage.", error);
             players = Array(5).fill(
                 {
                     id: 0,
@@ -54,10 +70,14 @@ export default function TeamBoard() {
     const { name, cash, total_points, weekly_points } = userTeam;
 
     // Ensure there are at least 5 players for the layout
-    const topPlayers = players.slice(0, 3);
-    const bottomPlayers = players.slice(3, 5);
+    //const topPlayers = players.slice(0, 3);
+    //const bottomPlayers = players.slice(3, 5);
     const officePositions = ['CS', 'CC', 'PR'];
     const warehousePositions = ['PI', 'PA'];
+    // Filter players based on their positions
+    const officePlayers = players.filter(player => officePositions.includes(player.position));
+    const warehousePlayers = players.filter(player => warehousePositions.includes(player.position));
+
 
     return (
         <div className="w-full h-full">
@@ -83,12 +103,12 @@ export default function TeamBoard() {
                 <div className="grid gap-0 border border-l-0 border-gray-300">
                     {/* Top row with 3 columns */}
                     <div className="grid grid-cols-3 divide-x divide-gray-300 border-t border-gray-300">
-                        {topPlayers.map((player, i) => (
+                        {officePlayers.map((player, i) => (
                             <div key={player.id} className="p-6 flex flex-col justify-between items-center">
                                 <p>{officePositions[i]}</p>
                                 <UserRound size={80} strokeWidth={0.25} className="border border-gray-300 rounded-full mt-2" />
                                 <p>{player.name}</p>
-                                <p>{player.overall_rating.toFixed(1)}</p>
+                                <p>{player.overall_rating}</p>
                                 <div className="flex flex-col text-sm my-2">
                                     <p>Attendance: {player.attendance}</p>
                                     <p>Social: {player.social}</p>
@@ -102,12 +122,12 @@ export default function TeamBoard() {
 
                     {/* Bottom row with 2 columns */}
                     <div className="grid grid-cols-2 divide-x divide-gray-300 border-t border-gray-300">
-                        {bottomPlayers.map((player, i) => (
+                        {warehousePlayers.map((player, i) => (
                             <div key={player.id} className="p-6 flex flex-col justify-between items-center">
                                 <p>{warehousePositions[i]}</p>
                                 <UserRound size={80} strokeWidth={0.25} className="border border-gray-300 rounded-full mt-2" />
                                 <p>{player.name}</p>
-                                <p>{player.overall_rating.toFixed(1)}</p>
+                                <p>{player.overall_rating}</p>
                                 <div className="flex flex-col text-sm my-2">
                                     <p>Attendance: {player.attendance}</p>
                                     <p>Social: {player.social}</p>
