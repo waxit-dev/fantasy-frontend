@@ -1,83 +1,53 @@
 "use client";
 import { Forklift, Monitor, UserRound } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function TeamBoard() {
     const router = useRouter();
+    const [teamData, setTeamData] = useState(null);
+    const [players, setPlayers] = useState([]);
 
-    const storedTeam = localStorage.getItem("userTeam");
-    let userTeam;
-    if (storedTeam) {
-        userTeam = JSON.parse(storedTeam);
-    } else {
-        router.push("/auth/login");
-    }
+    // Fetch team and players data
+    const fetchTeamData = async () => {
+        console.log('fetchTeamData');
+        const storedTeam = localStorage.getItem("userTeam");
+        if (storedTeam) {
+            const userTeam = JSON.parse(storedTeam);
 
-    const storedPlayers = localStorage.getItem("teamPlayers");
-    let players;
-
-    if (storedPlayers) {
-        try {
-            players = JSON.parse(storedPlayers);
-            if (players.length < 5) {
-                let tempPlayers = Array(5 - players.length).fill(
-                    {
-                        id: 0,
-                        name: "Select Player",
-                        overall_rating: 0.00,
-                        attendance: 0,
-                        social: 0,
-                        productivity: 0,
-                        intensity: 0,
-                        specialty_rating: 0,
-                        salary: 0
-                    }
-                );
-                players = [...players, ...tempPlayers];
-            }
-        } catch (error) {
-            console.error("Error parsing JSON from localStorage.", error);
-            players = Array(5).fill(
-                {
-                    id: 0,
-                    name: "Select Player",
-                    overall_rating: 0.00,
-                    attendance: 0,
-                    social: 0,
-                    productivity: 0,
-                    intensity: 0,
-                    specialty_rating: 0,
-                    salary: 0
-                }
-            );
+            // Assuming you have an endpoint to fetch updated team data
+            const response = await fetch(`http://localhost:5000/api/teams/${userTeam.id}`);
+            const data = await response.json();
+            console.log(data);
+            setTeamData(data.userTeam);
+            setPlayers(data.userPlayers);
+        } else {
+            router.push("/auth/login");
         }
-    } else {
-        players = Array(5).fill(
-            {
-                id: 0,
-                name: "Select Player",
-                overall_rating: 0.00,
-                attendance: 0,
-                social: 0,
-                productivity: 0,
-                intensity: 0,
-                specialty_rating: 0,
-                salary: 0
-            }
-        );
-    }
+    };
 
-    const { name, cash, total_points, weekly_points } = userTeam;
+    useEffect(() => {
+        fetchTeamData(); // Initial data fetch when the component loads
+    }, []); // Runs once on mount
+    // Function to fill missing positions with the placeholder player
+    const fillPositions = (positions, players) => {
+        return positions.map(position => {
+            const playerInPosition = players.find(player => player.position === position);
+            return playerInPosition || { ...placeholderPlayer, position };
+        });
+    };
+
+    if (!teamData) {
+        return <div>Loading...</div>;
+    }
+    const { name, cash, total_points, weekly_points } = teamData;
 
     // Ensure there are at least 5 players for the layout
-    //const topPlayers = players.slice(0, 3);
-    //const bottomPlayers = players.slice(3, 5);
     const officePositions = ['CS', 'CC', 'PR'];
     const warehousePositions = ['PI', 'PA'];
-    // Filter players based on their positions
-    const officePlayers = players.filter(player => officePositions.includes(player.position));
-    const warehousePlayers = players.filter(player => warehousePositions.includes(player.position));
-
+    // Fill missing office and warehouse positions
+    const filledOfficePlayers = fillPositions(officePositions, players);
+    const filledWarehousePlayers = fillPositions(warehousePositions, players);
 
     return (
         <div className="w-full h-full">
@@ -103,8 +73,8 @@ export default function TeamBoard() {
                 <div className="grid gap-0 border border-l-0 border-gray-300">
                     {/* Top row with 3 columns */}
                     <div className="grid grid-cols-3 divide-x divide-gray-300 border-t border-gray-300">
-                        {officePlayers.map((player, i) => (
-                            <div key={player.id} className="p-6 flex flex-col justify-between items-center">
+                        {filledOfficePlayers.map((player, i) => (
+                            <div key={1000 + i} className="p-6 flex flex-col justify-between items-center">
                                 <p>{officePositions[i]}</p>
                                 <UserRound size={80} strokeWidth={0.25} className="border border-gray-300 rounded-full mt-2" />
                                 <p>{player.name}</p>
@@ -122,8 +92,8 @@ export default function TeamBoard() {
 
                     {/* Bottom row with 2 columns */}
                     <div className="grid grid-cols-2 divide-x divide-gray-300 border-t border-gray-300">
-                        {warehousePlayers.map((player, i) => (
-                            <div key={player.id} className="p-6 flex flex-col justify-between items-center">
+                        {filledWarehousePlayers.map((player, i) => (
+                            <div key={2000 + i} className="p-6 flex flex-col justify-between items-center">
                                 <p>{warehousePositions[i]}</p>
                                 <UserRound size={80} strokeWidth={0.25} className="border border-gray-300 rounded-full mt-2" />
                                 <p>{player.name}</p>
@@ -133,7 +103,7 @@ export default function TeamBoard() {
                                     <p>Social: {player.social}</p>
                                     <p>Productivity: {player.productivity}</p>
                                     <p>Intensity: {player.intensity}</p>
-                                    <p>Specialty Rating: {player.specialty}</p>
+                                    <p>Specialty Rating: {player.specialty_rating}</p>
                                 </div>
                             </div>
                         ))}

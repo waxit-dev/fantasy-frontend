@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import {
@@ -20,31 +20,42 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { User } from "lucide-react";
-import { revalidatePath } from "next/cache";
 
 const formatCurrency = (number) => {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
-        minimumFractionDigits: 0, // Removes the decimal places
+        minimumFractionDigits: 0,
     }).format(number);
 };
 
-export default function PlayerList(params) {
+export default function PlayerList({ fetchedPlayers }) {
     const router = useRouter();
     const [selectedRole, setSelectedRole] = useState("");
-    const storedTeam = localStorage.getItem("userTeam");
-    let userTeam;
-    if (storedTeam) {
-        userTeam = JSON.parse(storedTeam);
-    } else {
-        router.push("/auth/login");
-    }
+    const [teamData, setTeamData] = useState(null);
+    const [players, setPlayers] = useState([]);
 
-    const storedPlayers = localStorage.getItem("teamPlayers");
-    const players = JSON.parse(storedPlayers);
-    const { name, cash } = userTeam;
-    const [teamPlayersCount, setTeamPlayersCount] = useState(players.length);
+    // Fetch team and players data
+    const fetchTeamData = async () => {
+        console.log('fetchTeamData');
+        const storedTeam = localStorage.getItem("userTeam");
+        if (storedTeam) {
+            const userTeam = JSON.parse(storedTeam);
+
+            // Assuming you have an endpoint to fetch updated team data
+            const response = await fetch(`http://localhost:5000/api/teams/${userTeam.id}`);
+            const data = await response.json();
+            console.log(data);
+            setTeamData(data.userTeam);
+            setPlayers(data.userPlayers);
+        } else {
+            router.push("/auth/login");
+        }
+    };
+
+    useEffect(() => {
+        fetchTeamData(); // Initial data fetch when the component loads
+    }, []); // Runs once on mount
 
     const buyPlayer = async (player) => {
         try {
@@ -54,40 +65,39 @@ export default function PlayerList(params) {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    teamId: userTeam.id,  // teamId from localStorage
+                    teamId: teamData?.id,
                     playerId: player.id,
-                    position: selectedRole
+                    position: selectedRole,
                 }),
             });
 
             if (response.ok) {
-                console.log(`Player ${player.id} successfully purchased!`);
-                const data = await response.json();
-                const updatedUserTeam = data.userTeam;
-                const updatedTeamPlayers = data.teamPlayers;
-                localStorage.setItem("teamPlayers", JSON.stringify(updatedTeamPlayers));
-                localStorage.setItem("userTeam", JSON.stringify(updatedUserTeam));
-                setTeamPlayersCount(updatedTeamPlayers.length);
-                revalidatePath("/players");
-            } else {
-                console.error("Failed to purchase the player");
+                // Refetch team and players data after a successful purchase
+                await fetchTeamData();
+                setSelectedRole(""); // Clear selected role after purchase
             }
         } catch (error) {
-            console.error("An error occurred:", error);
+            console.error("Error purchasing player:", error);
         }
     };
 
+    if (!teamData) {
+        return <div>Loading...</div>;
+    }
+
+    const teamPlayersCount = players.length;
 
     return (
         <div className="w-full h-full">
             <div className="flex flex-row w-full justify-between h-5 mb-4">
                 <h1><a href="/" className="underline">Home</a> > Players</h1>
                 <div className="flex flex-row justify-between">
-                    <p>Cash ${cash} | Selected {teamPlayersCount}/5</p>
+                    <div></div>
+                    <p>{formatCurrency(teamData?.cash)} | Selected {teamPlayersCount}/5</p>
                 </div>
             </div>
             <div className="flex flex-col w-full">
-                {params.fetchedPlayers.map((player, i: number) => (
+                {fetchedPlayers.map((player, i: number) => (
                     <div key={i} className="flex flex-row justify-between items-center w-full mt-5 border border-gray-300 p-6">
                         <div className="flex flex-row items-center">
                             <User size={60} strokeWidth={0.5} className="border border-gray-300 rounded-full mr-4" />
@@ -116,7 +126,7 @@ export default function PlayerList(params) {
                                     {players.some((matchedPlayer) => matchedPlayer.id === player.id) ? (
                                         <p>Contracted</p>
                                     ) : (
-                                        <DialogTrigger asChild>
+                                        <DialogTrigger disabled={!Boolean(teamPlayersCount < 5)} asChild>
                                             <Button type="submit" onClick={() => buyPlayer(player)}>
                                                 BUY
                                             </Button>
@@ -158,12 +168,9 @@ export default function PlayerList(params) {
                             </div>
                         </div>
                     </div>
-                ))
-                }
+                ))}
             </div>
         </div>
     );
 }
-
-
 
