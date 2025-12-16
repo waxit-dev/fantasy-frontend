@@ -13,25 +13,60 @@ export async function generateStaticParams() {
 
 export default async function TeamProfile({ params }: { params: { slug: string } }) {
   // Fetch the specific team based on the slug from the URL
-  const team = await fetch(`http://localhost:5000/api/teams/${params.slug}`).then((res) => res.json());
+  const teamData = await fetch(`http://localhost:5000/api/teams/${params.slug}`).then((res) => {
+    if (!res.ok) {
+      throw new Error('Failed to fetch team');
+    }
+    return res.json();
+  }).catch((error) => {
+    console.error('Error fetching team:', error);
+    return null;
+  });
 
-  if (!team) {
+  if (!teamData || !teamData.userTeam) {
     return <div>Loading...</div>;  // Handle loading or error case
   }
 
-  const { name, points, players, cash } = team;
+  const { userTeam, userPlayers } = teamData;
+  const { name, cash, total_points, weekly_points } = userTeam;
+  const players = userPlayers || [];
+
+  // Placeholder player object
+  const placeholderPlayer = {
+    "id": "00",
+    "name": "Place Holder",
+    "specialty": "None",
+    "role": "None",
+    "overall_rating": "00.0",
+    "attendance": "00",
+    "social": "00",
+    "productivity": "00",
+    "intensity": "00",
+    "specialty_rating": "00",
+    "salary": "00.00",
+    "notion_name": null
+  };
+
+  // Function to fill missing positions with the placeholder player
+  const fillPositions = (positions: string[], players: any[]) => {
+    return positions.map(position => {
+      const playerInPosition = players.find(player => player.position === position);
+      return playerInPosition || { ...placeholderPlayer, position };
+    });
+  };
 
   // Ensure there are at least 5 players for the layout
-  const topPlayers = players.slice(0, 3);
-  const bottomPlayers = players.slice(3, 5);
   const officePositions = ['CS', 'CC', 'PR'];
   const warehousePositions = ['PI', 'PA'];
+  // Fill missing office and warehouse positions
+  const filledOfficePlayers = fillPositions(officePositions, players);
+  const filledWarehousePlayers = fillPositions(warehousePositions, players);
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] min-h-screen p-8 pb-20 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col row-start-2 items-center sm:items-start">
         <div className="flex flex-row w-full h-5 mb-4 px-8 justify-between">
-          <h1>{name} | Points: {points} | Cash: ${cash}</h1>
+          <h1>{name} | TTP: {total_points} | WP: {weekly_points} | Cash: ${parseInt(cash).toFixed(0)}</h1>
           <div className="flex flex-row">
             <a href="/teams" className="underline mx-2">Leaderboard</a>
             <a href="/players" className="underline">Player List</a>
@@ -52,12 +87,12 @@ export default async function TeamProfile({ params }: { params: { slug: string }
           <div className="grid gap-0 border border-l-0 border-gray-300">
             {/* Top row with 3 columns */}
             <div className="grid grid-cols-3 divide-x divide-gray-300 border-t border-gray-300">
-              {topPlayers.map((player, i) => (
-                <div key={player.id} className="p-6 flex flex-col justify-between items-center">
+              {filledOfficePlayers.map((player, i) => (
+                <div key={1000 + i} className="p-6 flex flex-col justify-between items-center">
                   <p>{officePositions[i]}</p>
                   <UserRound size={80} strokeWidth={0.25} className="border border-gray-300 rounded-full mt-2" />
                   <p>{player.name}</p>
-                  <p>{player.overall.toFixed(1)}</p>
+                  <p>{player.overall_rating}</p>
                   <div className="flex flex-col text-sm my-2">
                     <p>Attendance: {player.attendance}</p>
                     <p>Social: {player.social}</p>
@@ -71,18 +106,18 @@ export default async function TeamProfile({ params }: { params: { slug: string }
 
             {/* Bottom row with 2 columns */}
             <div className="grid grid-cols-2 divide-x divide-gray-300 border-t border-gray-300">
-              {bottomPlayers.map((player, i) => (
-                <div key={player.id} className="p-6 flex flex-col justify-between items-center">
+              {filledWarehousePlayers.map((player, i) => (
+                <div key={2000 + i} className="p-6 flex flex-col justify-between items-center">
                   <p>{warehousePositions[i]}</p>
                   <UserRound size={80} strokeWidth={0.25} className="border border-gray-300 rounded-full mt-2" />
                   <p>{player.name}</p>
-                  <p>{player.overall.toFixed(1)}</p>
+                  <p>{player.overall_rating}</p>
                   <div className="flex flex-col text-sm my-2">
-                    <p>Attendance: {player.ratings.attendance}</p>
-                    <p>Social: {player.ratings.social}</p>
-                    <p>Productivity: {player.ratings.productivity}</p>
-                    <p>Intensity: {player.ratings.intensity}</p>
-                    <p>Specialty Rating: {player.ratings.specialty}</p>
+                    <p>Attendance: {player.attendance}</p>
+                    <p>Social: {player.social}</p>
+                    <p>Productivity: {player.productivity}</p>
+                    <p>Intensity: {player.intensity}</p>
+                    <p>Specialty Rating: {player.specialty_rating}</p>
                   </div>
                 </div>
               ))}

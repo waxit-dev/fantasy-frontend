@@ -20,50 +20,37 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { User } from "lucide-react";
+import { revalidatePath } from "next/cache";
 
-const formatCurrency = (number: number) => {
+const formatCurrency = (number) => {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
-        minimumFractionDigits: 0,
+        minimumFractionDigits: 0, // Removes the decimal places
     }).format(number);
 };
 
-export default function PlayerList({ fetchedPlayers }: { fetchedPlayers: any[] }) {
+export default function PlayerList(params) {
     const router = useRouter();
     const [selectedRole, setSelectedRole] = useState("");
-    const [teamData, setTeamData] = useState<any>(null);
-    const [players, setPlayers] = useState<any[]>([]);
-    const [isPurchasing, setIsPurchasing] = useState(false);
+    const storedTeam = localStorage.getItem("userTeam");
+    let userTeam;
+    if (storedTeam) {
+        userTeam = JSON.parse(storedTeam);
+    } else {
+        router.push("/auth/login");
+    }
 
-    // Fetch team and players data
-    const fetchTeamData = async () => {
-        console.log('fetchTeamData');
-        const storedTeam = localStorage.getItem("userTeam");
-        if (storedTeam) {
-            const userTeam = JSON.parse(storedTeam);
-
-            // Assuming you have an endpoint to fetch updated team data
-            const response = await fetch(`http://localhost:5000/api/teams/${userTeam.id}`);
-            const data = await response.json();
-            console.log(data);
-            setTeamData(data.userTeam);
-            setPlayers(data.userPlayers);
-        } else {
-            router.push("/auth/login");
-        }
-    };
+    const storedPlayers = localStorage.getItem("teamPlayers");
+    const players = JSON.parse(storedPlayers);
+    const { name, cash } = userTeam;
+    const [teamPlayersCount, setTeamPlayersCount] = useState(players.length);
 
     useEffect(() => {
-        fetchTeamData(); // Initial data fetch when the component loads
-    }, []); // Runs once on mount
+        
+    },[selectedRole]);
 
-    const buyPlayer = async (player: any) => {
-        if (isPurchasing || !selectedRole) return; // Prevent double submission or purchase without role
-        
-        setIsPurchasing(true);
-        console.log(player);
-        
+    const buyPlayer = async (player) => {
         try {
             const response = await fetch("http://localhost:5000/api/players/purchase", {
                 method: "POST",
@@ -71,45 +58,39 @@ export default function PlayerList({ fetchedPlayers }: { fetchedPlayers: any[] }
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    teamId: teamData?.id || null,
+                    teamId: userTeam.id,  // teamId from localStorage
                     playerId: player.id,
-                    position: selectedRole,
+                    position: selectedRole
                 }),
             });
 
             if (response.ok) {
-                // Refetch team and players data after a successful purchase
-                await fetchTeamData();
-                setSelectedRole(""); // Clear selected role after purchase
+                console.log(`Player ${player.id} successfully purchased!`);
+                const data = await response.json();
+                const updatedUserTeam = data.userTeam;
+                const updatedTeamPlayers = data.teamPlayers;
+                localStorage.setItem("teamPlayers", JSON.stringify(updatedTeamPlayers));
+                localStorage.setItem("userTeam", JSON.stringify(updatedUserTeam));
+                setTeamPlayersCount(updatedTeamPlayers.length);
             } else {
-                const errorData = await response.json();
-                alert(`Failed to purchase player: ${errorData.message}`);
+                console.error("Failed to purchase the player");
             }
         } catch (error) {
-            console.error("Error purchasing player:", error);
-            alert("Error purchasing player. Please try again.");
-        } finally {
-            setIsPurchasing(false);
+            console.error("An error occurred:", error);
         }
     };
 
-    if (!teamData) {
-        return <div>Loading...</div>;
-    }
-
-    const teamPlayersCount = players.length;
 
     return (
         <div className="w-full h-full">
             <div className="flex flex-row w-full justify-between h-5 mb-4">
-                <h1><a href="/" className="underline">Home</a> &gt; Players</h1>
+                <h1><a href="/" className="underline">Home</a> > Players</h1>
                 <div className="flex flex-row justify-between">
-                    <div></div>
-                    <p>{formatCurrency(teamData?.cash)} | Selected {teamPlayersCount}/5</p>
+                    <p>Cash ${cash} | Selected {teamPlayersCount}/5</p>
                 </div>
             </div>
             <div className="flex flex-col w-full">
-                {fetchedPlayers.map((player, i: number) => (
+                {params.fetchedPlayers.map((player, i: number) => (
                     <div key={i} className="flex flex-row justify-between items-center w-full mt-5 border border-gray-300 p-6">
                         <div className="flex flex-row items-center">
                             <User size={60} strokeWidth={0.5} className="border border-gray-300 rounded-full mr-4" />
@@ -138,8 +119,8 @@ export default function PlayerList({ fetchedPlayers }: { fetchedPlayers: any[] }
                                     {players.some((matchedPlayer) => matchedPlayer.id === player.id) ? (
                                         <p>Contracted</p>
                                     ) : (
-                                        <DialogTrigger disabled={!Boolean(teamPlayersCount < 5)} asChild>
-                                            <Button>
+                                        <DialogTrigger asChild>
+                                            <Button type="submit" onClick={() => buyPlayer(player)}>
                                                 BUY
                                             </Button>
                                         </DialogTrigger>
@@ -171,8 +152,8 @@ export default function PlayerList({ fetchedPlayers }: { fetchedPlayers: any[] }
                                             </div>
                                         </div>
                                         <DialogFooter>
-                                            <Button type="submit" onClick={() => buyPlayer(player)} disabled={isPurchasing || !selectedRole}>
-                                                {isPurchasing ? "PURCHASING..." : "BUY"}
+                                            <Button type="submit" onClick={() => buyPlayer(player)}>
+                                                BUY
                                             </Button>
                                         </DialogFooter>
                                     </DialogContent>
@@ -180,9 +161,12 @@ export default function PlayerList({ fetchedPlayers }: { fetchedPlayers: any[] }
                             </div>
                         </div>
                     </div>
-                ))}
+                ))
+                }
             </div>
         </div>
     );
 }
+
+
 
