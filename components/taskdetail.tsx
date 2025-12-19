@@ -24,9 +24,14 @@ import { Label } from "@/components/ui/label";
 interface ChecklistItem {
     id: string;
     description: string;
-    points: number;
+    points: number; // Team points
     checked: boolean;
     delegatedTo?: number | null; // Team ID that this item is delegated to
+    assignedPlayerId?: number | null; // Player ID assigned to this item
+    attribute?: 'attendance' | 'social' | 'productivity' | 'intensity' | null; // Attribute for player points
+    attributePoints?: number; // Points awarded to players with matching attribute (defaults to same as points)
+    specialty?: string | null; // Specialty name (e.g., "Finer Details", "Operational Backbone")
+    specialtyPoints?: number; // Points awarded to players with matching specialty
     subItems?: ChecklistItem[];
 }
 
@@ -44,10 +49,13 @@ export default function TaskDetail() {
     const taskId = params?.id as string;
     
     const [teamData, setTeamData] = useState(null);
+    const [teamPlayers, setTeamPlayers] = useState<any[]>([]);
     const [taskInstance, setTaskInstance] = useState<TaskInstance | null>(null);
     const [allTeams, setAllTeams] = useState([]);
     const [delegationDialogOpen, setDelegationDialogOpen] = useState<{ [itemId: string]: boolean }>({});
     const [selectedTeamForDelegation, setSelectedTeamForDelegation] = useState<{ [itemId: string]: string }>({});
+    const [playerAssignmentDialogOpen, setPlayerAssignmentDialogOpen] = useState<{ [itemId: string]: boolean }>({});
+    const [selectedPlayerForAssignment, setSelectedPlayerForAssignment] = useState<{ [itemId: string]: string }>({});
 
     // Initialize task template with checklist items
     const getTaskTemplate = (taskId: string): ChecklistItem[] => {
@@ -55,19 +63,19 @@ export default function TaskDetail() {
             return [
                 { id: "1", description: "Set title", points: 1, checked: false, delegatedTo: null },
                 { id: "2", description: "Set description", points: 1, checked: false, delegatedTo: null },
-                { id: "3", description: "Upload media", points: 1, checked: false, delegatedTo: null },
+                { id: "3", description: "Upload media", points: 1, checked: false, delegatedTo: null, specialty: "Finer Details", specialtyPoints: 0.5 },
                 { id: "4", description: "Set product type", points: 0.5, checked: false, delegatedTo: null },
                 { id: "5", description: "Set vendor", points: 0.5, checked: false, delegatedTo: null },
-                { id: "6", description: "Set appropriate tags, especially trade related", points: 1, checked: false, delegatedTo: null },
+                { id: "6", description: "Set appropriate tags, especially trade related", points: 1, checked: false, delegatedTo: null, specialty: "Operational Backbone", specialtyPoints: 0.5 },
                 { id: "7", description: "Assign appropriate theme template", points: 0.5, checked: false, delegatedTo: null },
                 { id: "8", description: "Set a default price greater than $0", points: 1, checked: false, delegatedTo: null },
-                { id: "9", description: "Set SKU", points: 1, checked: false, delegatedTo: null },
+                { id: "9", description: "Set SKU", points: 1, checked: false, delegatedTo: null, specialty: "Product Knowledge", specialtyPoints: 1 },
                 { id: "10", description: "Add variant options if necessary", points: 1.5, checked: false, delegatedTo: null },
-                { id: "11", description: "Set appropriate metafields", points: 2, checked: false, delegatedTo: null },
-                { id: "12", description: "Set meta title less than 66 characters", points: 1, checked: false, delegatedTo: null },
-                { id: "13", description: "Set meta description less than 160 characters", points: 1, checked: false, delegatedTo: null },
+                { id: "11", description: "Set appropriate metafields", points: 2, checked: false, delegatedTo: null, specialty: "Digital Expert", specialtyPoints: 1 },
+                { id: "12", description: "Set meta title less than 66 characters", points: 1, checked: false, delegatedTo: null, specialty: "Finer Details", specialtyPoints: 0.5 },
+                { id: "13", description: "Set meta description less than 160 characters", points: 1, checked: false, delegatedTo: null, specialty: "Finer Details", specialtyPoints: 0.5 },
                 { id: "14", description: "Set appropriate sales channels", points: 0.5, checked: false, delegatedTo: null },
-                { id: "15", description: "If necessary, set and confirm correct trade catalog pricing", points: 2, checked: false, delegatedTo: null },
+                { id: "15", description: "If necessary, set and confirm correct trade catalog pricing", points: 2, checked: false, delegatedTo: null, specialty: "Digital Expert", specialtyPoints: 1 },
                 {
                     id: "16",
                     description: "Is the product a dangerous good?",
@@ -83,17 +91,17 @@ export default function TaskDetail() {
                             checked: false,
                             delegatedTo: null,
                             subItems: [
-                                { id: "16-2-1", description: "Add product information to DG Register", points: 2, checked: false, delegatedTo: null },
-                                { id: "16-2-2", description: "Add product to Shopify DG Shipping Profile", points: 1, checked: false, delegatedTo: null },
-                                { id: "16-2-3", description: "Add SKU to Starshipit DG Checkout Rules", points: 2, checked: false, delegatedTo: null },
+                                { id: "16-2-1", description: "Add product information to DG Register", points: 2, checked: false, delegatedTo: null, specialty: "Finer Details", specialtyPoints: 1 },
+                                { id: "16-2-2", description: "Add product to Shopify DG Shipping Profile", points: 1, checked: false, delegatedTo: null, specialty: "Operational Backbone", specialtyPoints: 1 },
+                                { id: "16-2-3", description: "Add SKU to Starshipit DG Checkout Rules", points: 2, checked: false, delegatedTo: null, specialty: "Digital Expert", specialtyPoints: 1 },
                             ]
                         },
                     ]
                 },
                 { id: "17", description: "Confirm product is correctly linked and loaded in to Cin7 Core", points: 1, checked: false, delegatedTo: null },
                 { id: "18", description: "Update inventory quantities in Cin7", points: 1, checked: false, delegatedTo: null },
-                { id: "19", description: "Once product is finalised, confirm Bombley product load", points: 2, checked: false, delegatedTo: null },
-                { id: "20", description: "Set product status to Active", points: 1, checked: false, delegatedTo: null },
+                { id: "19", description: "Once product is finalised, confirm Bombley product load", points: 2, checked: false, delegatedTo: null, specialty: "Digital Expert", specialtyPoints: 1 },
+                { id: "20", description: "Set product status to Active", points: 1, checked: false, delegatedTo: null, attribute: 'social', attributePoints: 1 },
             ];
         }
         return [];
@@ -107,6 +115,7 @@ export default function TaskDetail() {
             const response = await fetch(`http://localhost:5000/api/teams/${userTeam.id}`);
             const data = await response.json();
             setTeamData(data.userTeam);
+            setTeamPlayers(data.userPlayers || []);
         } else {
             router.push("/auth/login");
         }
@@ -291,51 +300,179 @@ export default function TaskDetail() {
         localStorage.setItem(`taskInstances_${taskId}`, JSON.stringify(instances));
     };
 
+    // Assign player to an item
+    const assignPlayer = (itemId: string) => {
+        if (!taskInstance) return;
+        
+        const selectedPlayerId = selectedPlayerForAssignment[itemId];
+        if (!selectedPlayerId) return;
+
+        const playerId = parseInt(selectedPlayerId);
+        const updateItems = (items: ChecklistItem[]): ChecklistItem[] => {
+            return items.map(item => {
+                if (item.id === itemId) {
+                    return { ...item, assignedPlayerId: playerId };
+                }
+                if (item.subItems) {
+                    return { ...item, subItems: updateItems(item.subItems) };
+                }
+                return item;
+            });
+        };
+
+        const updatedInstance = {
+            ...taskInstance,
+            items: updateItems(taskInstance.items)
+        };
+
+        setTaskInstance(updatedInstance);
+        
+        // Save to localStorage
+        const storedInstances = localStorage.getItem(`taskInstances_${taskId}`);
+        let instances: TaskInstance[] = storedInstances ? JSON.parse(storedInstances) : [];
+        const index = instances.findIndex(inst => inst.id === updatedInstance.id);
+        if (index >= 0) {
+            instances[index] = updatedInstance;
+        }
+        localStorage.setItem(`taskInstances_${taskId}`, JSON.stringify(instances));
+        
+        setPlayerAssignmentDialogOpen({ ...playerAssignmentDialogOpen, [itemId]: false });
+        setSelectedPlayerForAssignment({ ...selectedPlayerForAssignment, [itemId]: '' });
+    };
+
+    // Remove player assignment from an item
+    const removePlayerAssignment = (itemId: string) => {
+        if (!taskInstance) return;
+
+        const updateItems = (items: ChecklistItem[]): ChecklistItem[] => {
+            return items.map(item => {
+                if (item.id === itemId) {
+                    return { ...item, assignedPlayerId: null };
+                }
+                if (item.subItems) {
+                    return { ...item, subItems: updateItems(item.subItems) };
+                }
+                return item;
+            });
+        };
+
+        const updatedInstance = {
+            ...taskInstance,
+            items: updateItems(taskInstance.items)
+        };
+
+        setTaskInstance(updatedInstance);
+        
+        // Save to localStorage
+        const storedInstances = localStorage.getItem(`taskInstances_${taskId}`);
+        let instances: TaskInstance[] = storedInstances ? JSON.parse(storedInstances) : [];
+        const index = instances.findIndex(inst => inst.id === updatedInstance.id);
+        if (index >= 0) {
+            instances[index] = updatedInstance;
+        }
+        localStorage.setItem(`taskInstances_${taskId}`, JSON.stringify(instances));
+    };
+
     // Submit task and award points
     const submitTask = async () => {
         if (!taskInstance || !teamData) return;
 
-        // Calculate points for each checked item and group by team
-        // We need to process items individually to respect delegation per item
-        const pointsByTeam: { [teamId: number]: number } = {};
+        // Collect all player assignments, task items with attributes/specialties, and calculate points by team
+        const pointsByTeam: { [teamId: number]: { points: number; playerAssignments: any[]; taskItems: any[]; taskProductivityBonus?: number } } = {};
 
-        const processItem = (item: ChecklistItem) => {
+        const processItem = (item: ChecklistItem, teamId: number) => {
             // Process this item if it's checked and has points
             if (item.checked && item.points > 0) {
-                const teamId = item.delegatedTo || teamData.id;
-                pointsByTeam[teamId] = (pointsByTeam[teamId] || 0) + item.points;
+                const effectiveTeamId = item.delegatedTo || teamId;
+                if (!pointsByTeam[effectiveTeamId]) {
+                    pointsByTeam[effectiveTeamId] = { points: 0, playerAssignments: [], taskItems: [] };
+                }
+                pointsByTeam[effectiveTeamId].points += item.points;
+                
+                // If player is assigned, add to assignments
+                if (item.assignedPlayerId) {
+                    pointsByTeam[effectiveTeamId].playerAssignments.push({
+                        playerId: item.assignedPlayerId,
+                        taskItemId: item.id,
+                        points: item.points
+                    });
+                }
+
+                // If item has an attribute, add to taskItems for attribute point awards
+                if (item.attribute) {
+                    pointsByTeam[effectiveTeamId].taskItems.push({
+                        itemId: item.id,
+                        attribute: item.attribute,
+                        attributePoints: item.attributePoints || item.points // Default to same as team points if not specified
+                    });
+                }
+
+                // If item has a specialty, add to taskItems for specialty point awards
+                if (item.specialty && item.specialtyPoints) {
+                    pointsByTeam[effectiveTeamId].taskItems.push({
+                        itemId: item.id,
+                        specialty: item.specialty,
+                        specialtyPoints: item.specialtyPoints
+                    });
+                }
             }
 
             // Process sub-items recursively
             if (item.subItems) {
-                item.subItems.forEach(subItem => processItem(subItem));
+                item.subItems.forEach(subItem => processItem(subItem, teamId));
             }
         };
 
         // Process all items (including nested ones)
-        taskInstance.items.forEach(item => processItem(item));
+        taskInstance.items.forEach(item => processItem(item, teamData.id));
 
-        // Award points to each team
-        const updatePromises = Object.entries(pointsByTeam).map(async ([teamId, points]) => {
+        // Add overall task productivity bonus for "add-product" task
+        if (taskId === "add-product" && pointsByTeam[teamData.id]) {
+            pointsByTeam[teamData.id].taskProductivityBonus = 2;
+        }
+
+        // Submit task completion for each team
+        const updatePromises = Object.entries(pointsByTeam).map(async ([teamId, data]) => {
             try {
-                const response = await fetch(`http://localhost:5000/api/teams/${teamId}/tasks/complete`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        points: points
-                    }),
-                });
+                // For the current user's team, use the new endpoint with player assignments
+                if (String(teamId) === String(teamData.id)) {
+                    const response = await fetch(`http://localhost:5000/api/teams/${teamId}/tasks/complete-with-players`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            taskId: taskId,
+                            points: data.points,
+                            playerAssignments: data.playerAssignments,
+                            taskItems: data.taskItems || [], // Items with attributes/specialties for point awards
+                            taskProductivityBonus: data.taskProductivityBonus || 0, // Overall task productivity bonus
+                            taskTags: [], // TODO: Add task tags from task metadata
+                            taskType: null // TODO: Add task type from task metadata
+                        }),
+                    });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    // Update team data if it's the current user's team
-                    if (String(teamId) === String(teamData.id)) {
-                        setTeamData(data.team);
+                    if (response.ok) {
+                        const responseData = await response.json();
+                        setTeamData(responseData.team);
+                    } else {
+                        console.error(`Failed to complete task:`, await response.text());
                     }
                 } else {
-                    console.error(`Failed to update team ${teamId} points:`, await response.text());
+                    // For delegated teams, use the old endpoint (backward compatibility)
+                    const response = await fetch(`http://localhost:5000/api/teams/${teamId}/tasks/complete`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            points: data.points
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        console.error(`Failed to update team ${teamId} points:`, await response.text());
+                    }
                 }
             } catch (error) {
                 console.error(`Error updating team ${teamId} points:`, error);
@@ -370,6 +507,7 @@ export default function TaskDetail() {
     const renderChecklistItem = (item: ChecklistItem, level: number = 0) => {
         const indentStyles = level > 0 ? { marginLeft: `${level * 1.5}rem` } : {};
         const delegatedTeam = allTeams.find((team: any) => String(team.id) === String(item.delegatedTo));
+        const assignedPlayer = teamPlayers.find((player: any) => player.id === item.assignedPlayerId);
         
         return (
             <div key={item.id} className="mb-2" style={indentStyles}>
@@ -386,13 +524,95 @@ export default function TaskDetail() {
                             {item.description}
                             {item.points > 0 && (
                                 <span className="ml-2 text-sm font-semibold text-green-600">
-                                    +{item.points}
+                                    +{item.points} team pts
+                                </span>
+                            )}
+                            {item.attribute && (
+                                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                                    {item.attribute}: +{item.attributePoints || item.points}
+                                </span>
+                            )}
+                            {item.specialty && item.specialtyPoints && (
+                                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">
+                                    Specialty({item.specialty}): +{item.specialtyPoints}
                                 </span>
                             )}
                         </span>
                     </label>
                     {!taskInstance?.submitted && (
-                        <div className="ml-4">
+                        <div className="ml-4 flex items-center gap-2">
+                            {/* Player Assignment */}
+                            {item.assignedPlayerId ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-purple-600">
+                                        👤 {assignedPlayer?.name || 'Unknown'}
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removePlayerAssignment(item.id)}
+                                        className="h-6 px-2 text-xs"
+                                    >
+                                        Remove
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Dialog
+                                    open={playerAssignmentDialogOpen[item.id] || false}
+                                    onOpenChange={(open) =>
+                                        setPlayerAssignmentDialogOpen({ ...playerAssignmentDialogOpen, [item.id]: open })
+                                    }
+                                >
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+                                            Assign Player
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Assign Player</DialogTitle>
+                                            <DialogDescription>
+                                                Select a player to assign to this task item. The player will earn attribute points based on task completion.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="grid gap-4 py-4">
+                                            <div className="grid grid-cols-4 items-center gap-4">
+                                                <Label htmlFor="player" className="text-right">
+                                                    Player
+                                                </Label>
+                                                <Select
+                                                    onValueChange={(value) =>
+                                                        setSelectedPlayerForAssignment({ ...selectedPlayerForAssignment, [item.id]: value })
+                                                    }
+                                                    value={selectedPlayerForAssignment[item.id] || ''}
+                                                >
+                                                    <SelectTrigger className="col-span-3">
+                                                        <SelectValue placeholder="Select a player" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {teamPlayers.map((player: any) => (
+                                                            <SelectItem key={player.id} value={player.id.toString()}>
+                                                                {player.name} ({player.overall_rating})
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button
+                                                type="submit"
+                                                onClick={() => assignPlayer(item.id)}
+                                                disabled={!selectedPlayerForAssignment[item.id]}
+                                            >
+                                                Assign
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            )}
+                            
+                            {/* Team Delegation */}
                             {item.delegatedTo ? (
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs text-blue-600">
