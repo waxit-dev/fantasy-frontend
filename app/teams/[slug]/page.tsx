@@ -68,8 +68,11 @@ export default async function TeamProfile({ params }: { params: { slug: string }
         <div className="flex flex-row w-full h-5 mb-4 px-8 justify-between">
           <h1>{name} | TTP: {total_points} | WP: {weekly_points} | Cash: ${parseInt(cash).toFixed(0)}</h1>
           <div className="flex flex-row">
+            <a href="/" className="underline mx-2">Home</a>
             <a href="/teams" className="underline mx-2">Leaderboard</a>
-            <a href="/players" className="underline">Player List</a>
+            <a href="/players" className="underline mx-2">Player List</a>
+            <a href="/tasks" className="underline mx-2">Task List</a>
+            <a href="/logs" className="underline">Logs</a>
           </div>
         </div>
 

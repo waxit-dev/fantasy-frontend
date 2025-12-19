@@ -70,7 +70,7 @@ export default function PlayerList({ fetchedPlayers }: { fetchedPlayers: any[] }
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
+                body        : JSON.stringify({
                     teamId: teamData?.id || null,
                     playerId: player.id,
                     position: selectedRole,

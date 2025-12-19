@@ -4,25 +4,14 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
-
-interface Task {
-    id: string;
-    title: string;
-    description?: string;
-}
+import { getAllTasks } from "@/lib/taskConfig";
 
 export default function TaskList() {
     const router = useRouter();
     const [teamData, setTeamData] = useState(null);
 
-    // Define available tasks (templates)
-    const availableTasks: Task[] = [
-        {
-            id: "add-product",
-            title: "Add a product to the store",
-            description: "Complete all steps to add a new product to the Shopify store"
-        }
-    ];
+    // Get available tasks from centralized config
+    const availableTasks = getAllTasks();
 
     // Fetch team data
     const fetchTeamData = async () => {
@@ -48,7 +37,7 @@ export default function TaskList() {
     return (
         <div className="w-full h-full">
             <div className="flex flex-row w-full justify-between h-5 mb-4">
-                <h1><a href="/" className="underline">Home</a> > Task List</h1>
+                <h1><a href="/" className="underline">Home</a> {'>'} Task List</h1>
             </div>
             <div className="flex flex-col w-full gap-4">
                 {availableTasks.map((task) => (

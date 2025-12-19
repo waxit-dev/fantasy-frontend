@@ -3,6 +3,7 @@ import { Forklift, Monitor, UserRound } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
+import Notifications from "@/components/Notifications";
 import {
     Dialog,
     DialogContent,
@@ -39,6 +40,23 @@ export default function TeamBoard() {
     useEffect(() => {
         fetchTeamData(); // Initial data fetch when the component loads
     }, []); // Runs once on mount
+
+    // Helper function to calculate cooldown status
+    const getCooldownStatus = (player: any) => {
+        const cooldownDays = 42; // 6 weeks
+        const purchaseDate = player.purchase_date ? new Date(player.purchase_date) : null;
+        
+        if (!purchaseDate) {
+            // If no purchase date, assume player can be sold (legacy data or edge case)
+            return { canSell: true, daysRemaining: 0, daysSincePurchase: cooldownDays };
+        }
+        
+        const now = new Date();
+        const daysSincePurchase = Math.floor((now.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24));
+        const daysRemaining = Math.max(0, cooldownDays - daysSincePurchase);
+        const canSell = daysRemaining === 0;
+        return { canSell, daysRemaining, daysSincePurchase };
+    };
 
     // Sell player function
     const sellPlayer = async (player: any) => {
@@ -107,10 +125,12 @@ export default function TeamBoard() {
         <div className="w-full h-full">
             <div className="flex flex-row w-full h-5 mb-4 px-8 justify-between">
                 <h1>{name} | TTP: {total_points} | WP: {weekly_points} | Cash: ${parseInt(cash).toFixed(0)}</h1>
-                <div className="flex flex-row">
+                <div className="flex flex-row items-center gap-2">
                     <a href="/teams" className="underline mx-2">Leaderboard</a>
                     <a href="/players" className="underline mx-2">Player List</a>
-                    <a href="/tasks" className="underline">Task List</a>
+                    <a href="/tasks" className="underline mx-2">Task List</a>
+                    <a href="/logs" className="underline mx-2">Logs</a>
+                    <Notifications />
                 </div>
             </div>
 
@@ -142,28 +162,50 @@ export default function TeamBoard() {
                                     <p>Specialty Rating: {player.specialty_rating}</p>
                                     {player.salary && <p>Salary: ${parseFloat(player.salary).toFixed(2)}</p>}
                                 </div>
-                                {player.id !== "00" && (
-                                    <Dialog>
-                                        <DialogTrigger asChild>
-                                            <Button variant="destructive" size="sm" className="mt-2">
-                                                SELL
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>Sell {player.name}?</DialogTitle>
-                                                <DialogDescription>
-                                                    Are you sure you want to sell this player? You will receive ${parseFloat(player.salary || 0).toFixed(2)} back to your team's cash. This action cannot be undone.
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <DialogFooter>
-                                                <Button variant="destructive" onClick={() => sellPlayer(player)}>
-                                                    Confirm Sell
+                                {player.id !== "00" && (() => {
+                                    const { canSell, daysRemaining } = getCooldownStatus(player);
+                                    return (
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button 
+                                                    variant="destructive" 
+                                                    size="sm" 
+                                                    className="mt-2"
+                                                    disabled={!canSell}
+                                                >
+                                                    {canSell ? "SELL" : `${daysRemaining}d`}
                                                 </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-                                )}
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Sell {player.name}?</DialogTitle>
+                                                    <DialogDescription>
+                                                        {canSell ? (
+                                                            <>
+                                                                Are you sure you want to sell this player? You will receive ${parseFloat(player.salary || 0).toFixed(2)} back to your team's cash. This action cannot be undone.
+                                                                {player.purchase_price && (
+                                                                    <span className="block mt-2 text-sm">
+                                                                        Purchase price: ${parseFloat(player.purchase_price).toFixed(2)} | 
+                                                                        Estimated profit: ${(parseFloat(player.salary || 0) - parseFloat(player.purchase_price || 0)).toFixed(2)}
+                                                                    </span>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            `This player cannot be sold yet. Contract cooldown: ${daysRemaining} days remaining (6 weeks from purchase date).`
+                                                        )}
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                {canSell && (
+                                                    <DialogFooter>
+                                                        <Button variant="destructive" onClick={() => sellPlayer(player)}>
+                                                            Confirm Sell
+                                                        </Button>
+                                                    </DialogFooter>
+                                                )}
+                                            </DialogContent>
+                                        </Dialog>
+                                    );
+                                })()}
                             </div>
                         ))}
                     </div>
@@ -184,28 +226,50 @@ export default function TeamBoard() {
                                     <p>Specialty Rating: {player.specialty_rating}</p>
                                     {player.salary && <p>Salary: ${parseFloat(player.salary).toFixed(2)}</p>}
                                 </div>
-                                {player.id !== "00" && (
-                                    <Dialog>
-                                        <DialogTrigger asChild>
-                                            <Button variant="destructive" size="sm" className="mt-2">
-                                                SELL
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>Sell {player.name}?</DialogTitle>
-                                                <DialogDescription>
-                                                    Are you sure you want to sell this player? You will receive ${parseFloat(player.salary || 0).toFixed(2)} back to your team's cash. This action cannot be undone.
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <DialogFooter>
-                                                <Button variant="destructive" onClick={() => sellPlayer(player)}>
-                                                    Confirm Sell
+                                {player.id !== "00" && (() => {
+                                    const { canSell, daysRemaining } = getCooldownStatus(player);
+                                    return (
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button 
+                                                    variant="destructive" 
+                                                    size="sm" 
+                                                    className="mt-2"
+                                                    disabled={!canSell}
+                                                >
+                                                    {canSell ? "SELL" : `${daysRemaining}d`}
                                                 </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
-                                )}
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Sell {player.name}?</DialogTitle>
+                                                    <DialogDescription>
+                                                        {canSell ? (
+                                                            <>
+                                                                Are you sure you want to sell this player? You will receive ${parseFloat(player.salary || 0).toFixed(2)} back to your team's cash. This action cannot be undone.
+                                                                {player.purchase_price && (
+                                                                    <span className="block mt-2 text-sm">
+                                                                        Purchase price: ${parseFloat(player.purchase_price).toFixed(2)} | 
+                                                                        Estimated profit: ${(parseFloat(player.salary || 0) - parseFloat(player.purchase_price || 0)).toFixed(2)}
+                                                                    </span>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            `This player cannot be sold yet. Contract cooldown: ${daysRemaining} days remaining (6 weeks from purchase date).`
+                                                        )}
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                {canSell && (
+                                                    <DialogFooter>
+                                                        <Button variant="destructive" onClick={() => sellPlayer(player)}>
+                                                            Confirm Sell
+                                                        </Button>
+                                                    </DialogFooter>
+                                                )}
+                                            </DialogContent>
+                                        </Dialog>
+                                    );
+                                })()}
                             </div>
                         ))}
                     </div>

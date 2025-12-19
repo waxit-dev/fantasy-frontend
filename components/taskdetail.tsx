@@ -20,6 +20,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { getTaskConfig, ChecklistItem as TaskChecklistItem } from "@/lib/taskConfig";
 
 interface ChecklistItem {
     id: string;
@@ -57,54 +58,37 @@ export default function TaskDetail() {
     const [playerAssignmentDialogOpen, setPlayerAssignmentDialogOpen] = useState<{ [itemId: string]: boolean }>({});
     const [selectedPlayerForAssignment, setSelectedPlayerForAssignment] = useState<{ [itemId: string]: string }>({});
 
-    // Initialize task template with checklist items
+    // Initialize task template with checklist items from config
     const getTaskTemplate = (taskId: string): ChecklistItem[] => {
-        if (taskId === "add-product") {
-            return [
-                { id: "1", description: "Set title", points: 1, checked: false, delegatedTo: null },
-                { id: "2", description: "Set description", points: 1, checked: false, delegatedTo: null },
-                { id: "3", description: "Upload media", points: 1, checked: false, delegatedTo: null, specialty: "Finer Details", specialtyPoints: 0.5 },
-                { id: "4", description: "Set product type", points: 0.5, checked: false, delegatedTo: null },
-                { id: "5", description: "Set vendor", points: 0.5, checked: false, delegatedTo: null },
-                { id: "6", description: "Set appropriate tags, especially trade related", points: 1, checked: false, delegatedTo: null, specialty: "Operational Backbone", specialtyPoints: 0.5 },
-                { id: "7", description: "Assign appropriate theme template", points: 0.5, checked: false, delegatedTo: null },
-                { id: "8", description: "Set a default price greater than $0", points: 1, checked: false, delegatedTo: null },
-                { id: "9", description: "Set SKU", points: 1, checked: false, delegatedTo: null, specialty: "Product Knowledge", specialtyPoints: 1 },
-                { id: "10", description: "Add variant options if necessary", points: 1.5, checked: false, delegatedTo: null },
-                { id: "11", description: "Set appropriate metafields", points: 2, checked: false, delegatedTo: null, specialty: "Digital Expert", specialtyPoints: 1 },
-                { id: "12", description: "Set meta title less than 66 characters", points: 1, checked: false, delegatedTo: null, specialty: "Finer Details", specialtyPoints: 0.5 },
-                { id: "13", description: "Set meta description less than 160 characters", points: 1, checked: false, delegatedTo: null, specialty: "Finer Details", specialtyPoints: 0.5 },
-                { id: "14", description: "Set appropriate sales channels", points: 0.5, checked: false, delegatedTo: null },
-                { id: "15", description: "If necessary, set and confirm correct trade catalog pricing", points: 2, checked: false, delegatedTo: null, specialty: "Digital Expert", specialtyPoints: 1 },
-                {
-                    id: "16",
-                    description: "Is the product a dangerous good?",
-                    points: 0,
-                    checked: false,
-                    delegatedTo: null,
-                    subItems: [
-                        { id: "16-1", description: "No", points: 1, checked: false, delegatedTo: null },
-                        {
-                            id: "16-2",
-                            description: "Yes",
-                            points: 0,
-                            checked: false,
-                            delegatedTo: null,
-                            subItems: [
-                                { id: "16-2-1", description: "Add product information to DG Register", points: 2, checked: false, delegatedTo: null, specialty: "Finer Details", specialtyPoints: 1 },
-                                { id: "16-2-2", description: "Add product to Shopify DG Shipping Profile", points: 1, checked: false, delegatedTo: null, specialty: "Operational Backbone", specialtyPoints: 1 },
-                                { id: "16-2-3", description: "Add SKU to Starshipit DG Checkout Rules", points: 2, checked: false, delegatedTo: null, specialty: "Digital Expert", specialtyPoints: 1 },
-                            ]
-                        },
-                    ]
-                },
-                { id: "17", description: "Confirm product is correctly linked and loaded in to Cin7 Core", points: 1, checked: false, delegatedTo: null },
-                { id: "18", description: "Update inventory quantities in Cin7", points: 1, checked: false, delegatedTo: null },
-                { id: "19", description: "Once product is finalised, confirm Bombley product load", points: 2, checked: false, delegatedTo: null, specialty: "Digital Expert", specialtyPoints: 1 },
-                { id: "20", description: "Set product status to Active", points: 1, checked: false, delegatedTo: null, attribute: 'social', attributePoints: 1 },
-            ];
+        const taskConfig = getTaskConfig(taskId);
+        if (!taskConfig) {
+            console.warn(`Task config not found for taskId: ${taskId}`);
+            return [];
         }
-        return [];
+
+        // Convert task config items to checklist items with default state
+        const convertItem = (item: TaskChecklistItem): ChecklistItem => {
+            const checklistItem: ChecklistItem = {
+                id: item.id,
+                description: item.description,
+                points: item.points,
+                checked: false,
+                delegatedTo: null,
+                assignedPlayerId: null,
+                attribute: item.attribute || null,
+                attributePoints: item.attributePoints,
+                specialty: item.specialty || null,
+                specialtyPoints: item.specialtyPoints,
+            };
+
+            if (item.subItems) {
+                checklistItem.subItems = item.subItems.map(convertItem);
+            }
+
+            return checklistItem;
+        };
+
+        return taskConfig.items.map(convertItem);
     };
 
     // Fetch team data
@@ -424,18 +408,23 @@ export default function TaskDetail() {
         };
 
         // Process all items (including nested ones)
-        taskInstance.items.forEach(item => processItem(item, teamData.id));
+        const currentTeamId = (teamData as any).id;
+        taskInstance.items.forEach(item => processItem(item, currentTeamId));
 
-        // Add overall task productivity bonus for "add-product" task
-        if (taskId === "add-product" && pointsByTeam[teamData.id]) {
-            pointsByTeam[teamData.id].taskProductivityBonus = 2;
+        // Add overall task productivity bonus and task category if configured
+        const taskConfig = getTaskConfig(taskId);
+        if (taskConfig?.productivityBonus && pointsByTeam[currentTeamId]) {
+            pointsByTeam[currentTeamId].taskProductivityBonus = taskConfig.productivityBonus;
         }
+        const taskCategory = taskConfig?.taskCategory;
 
         // Submit task completion for each team
-        const updatePromises = Object.entries(pointsByTeam).map(async ([teamId, data]) => {
+        const updatePromises = Object.entries(pointsByTeam).map(async ([teamIdStr, data]) => {
             try {
+                const teamId = Number(teamIdStr);
                 // For the current user's team, use the new endpoint with player assignments
-                if (String(teamId) === String(teamData.id)) {
+                const currentTeamId = (teamData as any).id;
+                if (teamId === currentTeamId) {
                     const response = await fetch(`http://localhost:5000/api/teams/${teamId}/tasks/complete-with-players`, {
                         method: 'POST',
                         headers: {
@@ -448,7 +437,8 @@ export default function TaskDetail() {
                             taskItems: data.taskItems || [], // Items with attributes/specialties for point awards
                             taskProductivityBonus: data.taskProductivityBonus || 0, // Overall task productivity bonus
                             taskTags: [], // TODO: Add task tags from task metadata
-                            taskType: null // TODO: Add task type from task metadata
+                            taskType: null, // TODO: Add task type from task metadata
+                            taskCategory: taskCategory // 'warehouse' or 'office'
                         }),
                     });
 
@@ -475,7 +465,7 @@ export default function TaskDetail() {
                     }
                 }
             } catch (error) {
-                console.error(`Error updating team ${teamId} points:`, error);
+                console.error(`Error updating team ${teamIdStr} points:`, error);
             }
         });
 
@@ -564,7 +554,12 @@ export default function TaskDetail() {
                                     }
                                 >
                                     <DialogTrigger asChild>
-                                        <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-6 px-2 text-xs"
+                                            disabled={!!item.delegatedTo}
+                                        >
                                             Assign Player
                                         </Button>
                                     </DialogTrigger>
@@ -616,7 +611,7 @@ export default function TaskDetail() {
                             {item.delegatedTo ? (
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs text-blue-600">
-                                        → {delegatedTeam?.name || 'Unknown'}
+                                        → {(delegatedTeam as any)?.name || 'Unknown'}
                                     </span>
                                     <Button
                                         variant="ghost"
@@ -635,7 +630,12 @@ export default function TaskDetail() {
                                     }
                                 >
                                     <DialogTrigger asChild>
-                                        <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-6 px-2 text-xs"
+                                            disabled={!!item.assignedPlayerId}
+                                        >
                                             Delegate
                                         </Button>
                                     </DialogTrigger>
@@ -661,8 +661,8 @@ export default function TaskDetail() {
                                                         <SelectValue placeholder="Select a team" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {allTeams
-                                                            .filter((team: any) => team.id !== teamData?.id)
+                                                        {(allTeams as any[])
+                                                            .filter((team: any) => team.id !== (teamData as any)?.id)
                                                             .map((team: any) => (
                                                                 <SelectItem key={team.id} value={team.id.toString()}>
                                                                     {team.name}
@@ -701,14 +701,15 @@ export default function TaskDetail() {
     }
 
     const totalPoints = calculateTotalPoints(taskInstance.items);
-    const taskTitle = taskId === "add-product" ? "Add a product to the store" : "Task";
+    const taskConfig = getTaskConfig(taskId);
+    const taskTitle = taskConfig?.title || "Task";
 
     return (
         <div className="w-full h-full">
             <div className="flex flex-row w-full justify-between h-5 mb-4">
                 <h1>
-                    <a href="/" className="underline">Home</a> > 
-                    <a href="/tasks" className="underline"> Task List</a> > 
+                    <a href="/" className="underline">Home</a> {'>'} 
+                    <a href="/tasks" className="underline"> Task List</a> {'>'} 
                     {taskTitle}
                 </h1>
                 <div className="flex flex-row justify-between items-center gap-4">
